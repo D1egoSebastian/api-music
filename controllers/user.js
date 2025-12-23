@@ -1,7 +1,8 @@
 //imports
-const validate = require("../helpers/validator")
+const validate = require("../helpers/validator");
 const User = require("../models/user");
-const bycrpt = require("bcrypt");
+const bcrypt = require("bcrypt");
+
 
 const test = async (req, res) => {
         try{
@@ -9,9 +10,14 @@ const test = async (req, res) => {
             status: "success",
             message: "ruta de prueba en controllers/user.js"
         })
-    }catch(e){
-        throw new Error("No se pudo conectar a la ruta de prueba.")
-    }
+    }catch (e) {
+    return res.status(500).send({
+        status: "error",
+        message: "Error interno del servidor",
+        error: e.message
+    });
+}
+
 }
 
 //Controlador de registro
@@ -43,22 +49,22 @@ const register = async (req, res) => {
         //control de usuarios duplicados
         const userDuplicated = await User.find({
             $or: [
-                {email: params.email.tolowerCase()},
-                {nick: params.nick.tolowerCase()}
+                {email: params.email.toLowerCase()},
+                {nick: params.nick.toLowerCase()}
             ]
         })
 
-        if(!userDuplicated || userDuplicated.length >=1){
+        if(userDuplicated.length >=1){
             return res.status(400).send({
                 status: "error",
-                message: "Usuario duplicado"
+                message: "Usuario duplicado o ya existe"
             })
         }
 
 
         //cifrar la contra
         try{
-            const hashedPassword = await bycrpt.hash(params.password, 10);
+            const hashedPassword = await bcrypt.hash(params.password, 10);
             params.password = hashedPassword;
         }catch(e){
             return res.status(500).send({
@@ -73,6 +79,8 @@ const register = async (req, res) => {
 
         //guardar usuario en la db
         let UserSave = await userToSave.save();
+
+        UserSave.password = undefined
 
         if(!UserSave){
             return res.status(500).send({
@@ -89,18 +97,72 @@ const register = async (req, res) => {
         })
 
         //devolver res
-        return res.status(200).send({
-        status: "success",
-        message: "metodo del registro",
-        params
-    })
-    }catch(e){
-        throw new Error("No se pudo conectar a la ruta de prueba.")
-    }
+    }catch (e) {
+    return res.status(500).send({
+        status: "error",
+        message: "Error interno del servidor",
+        error: e.message
+    });
+}
+
     
+}
+
+const login = async (req, res) => {
+    try{
+
+        //recoger parametros
+        let params = req.body;
+        //comprobar que llegan
+        if(!params.email || !params.password){
+            return res.status(400).send({
+                status: "error",
+                message: "parametros invalidos o faltan datos por enviar."
+            })
+        }
+
+        //buscar en la db si existe el usuario
+        let userToFind = await User.findOne({email: params.email.toLowerCase()})
+                                    .select("+password");
+
+        if(!userToFind){
+            return res.status(400).send({
+                status: "error",
+                message: "No existe este usuario."
+            })
+        }
+
+        //comprobar su contra
+        const checkPassword = await bcrypt.compareSync(params.password, userToFind.password)
+        if(!checkPassword){
+            return res.status(400).send({
+                status: "error",
+                message: "usuario o contra invalidos"
+            })
+        }
+
+        userToFind.password = undefined
+
+        //Conseguir token jwt (crear servicio token)
+
+        // Devolver datos usuario y token
+        return res.status(200).send({
+            status: "success",
+            message: "metodo de Login",
+            user: userToFind
+        })
+    }catch (e) {
+    return res.status(500).send({
+        status: "error",
+        message: "Error interno del servidor",
+        error: e.message
+    });
+}
+
 }
 
 module.exports = {
     test,
-    register
+    register,
+    login
 }
