@@ -11,6 +11,7 @@ const UserController = require("../controllers/user")
 router.get("/test-user", UserController.test)
 router.post("/register", UserController.register)
 router.post("/login", UserController.login)
+router.get("/profile/:id", UserController.profile);
 
 //Exportar
 

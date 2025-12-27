@@ -2,6 +2,7 @@
 const validate = require("../helpers/validator");
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
+const jwtService = require("../helpers/jwt")
 
 
 const test = async (req, res) => {
@@ -123,7 +124,7 @@ const login = async (req, res) => {
 
         //buscar en la db si existe el usuario
         let userToFind = await User.findOne({email: params.email.toLowerCase()})
-                                    .select("+password");
+                                    .select("+password +role");
 
         if(!userToFind){
             return res.status(400).send({
@@ -133,7 +134,7 @@ const login = async (req, res) => {
         }
 
         //comprobar su contra
-        const checkPassword = await bcrypt.compareSync(params.password, userToFind.password)
+        const checkPassword = await bcrypt.compare(params.password, userToFind.password)
         if(!checkPassword){
             return res.status(400).send({
                 status: "error",
@@ -144,12 +145,14 @@ const login = async (req, res) => {
         userToFind.password = undefined
 
         //Conseguir token jwt (crear servicio token)
+        const token = jwtService.createToken(userToFind)
 
         // Devolver datos usuario y token
         return res.status(200).send({
             status: "success",
             message: "metodo de Login",
-            user: userToFind
+            user: userToFind,
+            token
         })
     }catch (e) {
     return res.status(500).send({
@@ -161,8 +164,39 @@ const login = async (req, res) => {
 
 }
 
+const profile = async (req, res) => {
+    try{
+
+        //recoger id del usuario url
+        let id = req.params.id;
+        //consulta para sacar datos del perfil
+        let userFind = await User.findById(id);
+
+        if(!userFind){
+            return res.status(400).send({
+                status: "error",
+                message: "usuario invalido o no existe."
+            })
+        }
+        //devolver res
+        return res.status(200).send({
+            status: "success",
+            message: "metodo de profile",
+            id,
+            user: userFind
+        })
+    }catch (e) {
+    return res.status(500).send({
+        status: "error",
+        message: "Error interno del servidor",
+        error: e.message
+    });
+}
+}
+
 module.exports = {
     test,
     register,
-    login
+    login,
+    profile
 }
