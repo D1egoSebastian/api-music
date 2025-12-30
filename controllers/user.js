@@ -194,9 +194,98 @@ const profile = async (req, res) => {
 }
 }
 
+const update = async (req, res) => {
+
+    try{
+        //recoger datos del usuario identificado
+        const userIdentity = req.user;
+        //recoger datos a actualizar
+        const userToUpdate = req.body
+
+        try{
+            validate(userToUpdate)
+        }catch(e){
+            return res.status(400).send({
+                    status: "error",
+                    message: "validacion no superada"
+                });
+        }
+
+        //comprobar si existe
+        const userToFind = await User.find({
+            $or: [
+                {email: userToUpdate.email?.toLowerCase()},
+                {nick: userToUpdate.nick?.toLowerCase()}
+            ]
+        })
+
+        //comprobar si el usuario existe y no soy yo(el identificado)
+        let userIsset = false;
+
+        userToFind.forEach(user => {
+            if(user && user.id != userIdentity.id) {
+                userIsset = true;
+            }
+        });
+
+        if(userIsset){
+            return res.status(400).send({
+                status: "error",
+                message: "El usuario ya existe."
+            })
+        }
+
+        //Cifrar password si llega
+        if(userToUpdate.password){
+            const crypt = await bcrypt.hash(userToUpdate.password, 10)
+            userToUpdate.password = crypt
+        } else {
+            delete userToUpdate.password;
+        }
+
+        //buscar usuario en bd y actualizar datos
+        try{
+            const userUpdated = await User.findByIdAndUpdate(
+                userIdentity.id,
+                userToUpdate,
+                {new: true} // options con esto le aclaramos que se hagan cambios new
+            );
+
+            userUpdated.password = undefined;
+
+            if(!userUpdated){
+                return res.status(400).send({
+                status: "error",
+                message: "Error al actualizar."
+                })
+            }
+
+            return res.status(200).send({
+                        status: "success",
+                        message: "metodo de update",
+                        usuarioEditado: userUpdated
+                    })
+        }catch(e){
+            return res.status(400).send({
+                status: "error",
+                message: "Error al actualizar."
+                })
+        }
+
+    }catch (e) {
+        return res.status(500).send({
+            status: "error",
+            message: "Error interno del servidor",
+            error: e.message
+    });
+
+    }
+}
+
 module.exports = {
     test,
     register,
     login,
-    profile
+    profile,
+    update
 }
