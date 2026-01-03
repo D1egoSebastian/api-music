@@ -2,7 +2,9 @@
 const validate = require("../helpers/validator");
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
-const jwtService = require("../helpers/jwt")
+const jwtService = require("../helpers/jwt");
+const fs = require("fs");
+const path = require("path");
 
 
 const test = async (req, res) => {
@@ -282,10 +284,88 @@ const update = async (req, res) => {
     }
 }
 
+
+const upload = async (req, res) => {
+    try{
+            //configuracion de subida (multer)
+
+    //recoger fichero de imagen y comprobar si existe
+    if(!req.file){
+        return res.status(400).send({
+            status: "error",
+            message: "la peticion no esta incluida la imagen."
+        })
+    }
+    //conseguir nombre del archivo
+    let image = req.file.originalname;
+    //sacar info de la imagen
+    let imageSplit = image.split("\.");
+    let extension = imageSplit[1];
+    //comprobar ext si es valida
+    if(extension != "png" && extension != "jpg" && extension != "gif") {
+
+        //borrar archivo
+        const filePath = req.file.path;
+        const fileDeleted = fs.unlinkSync(filePath)
+
+        return res.status(400).send({
+            status: "error",
+            message: "la extension es invalida"
+        })
+
+
+
+    }
+    //si es correcto, guardar en db
+    let userImageUpdate = await User.findOneAndUpdate({_id: req.user.id}, {image: req.file.filename}, {new: true})
+
+    if(!userImageUpdate){
+        return res.status(400).send({
+            status: "error",
+            message: "ocurrio un error al guardar imagen"
+        })
+    }
+
+            return res.status(200).send({
+                        status: "success",
+                        message: "metodo de upload",
+                        user: userImageUpdate,
+                        file: req.file
+                    })
+    }catch (e) {
+        return res.status(500).send({
+            status: "error",
+            message: "Error interno del servidor",
+            error: e.message
+    });
+
+    }
+}
+
+const avatar = async (req, res) => {
+    //sacar parametro de la url
+    const file = req.params.file;
+    //construir el path
+    const filepath = "./uploads/avatars/" + file
+    //comprobar si existe
+    fs.stat(filepath, (error, exists) => {
+        if(error || !exists){
+            return res.status(400).send({
+            status: "error",
+            message: "la imagen es invalido o no existe, no se pudo mostrar."
+        })
+        }
+    })
+    //devolver fichero
+    return res.sendFile(path.resolve(filepath))
+}
+
 module.exports = {
     test,
     register,
     login,
     profile,
-    update
+    update,
+    upload,
+    avatar
 }
